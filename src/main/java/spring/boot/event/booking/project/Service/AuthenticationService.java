@@ -71,7 +71,6 @@ public class AuthenticationService {
         SecureRandom secureRandom = new SecureRandom();
         String otp = String.format("%06d", secureRandom.nextInt(1000000));
 
-        // Create and save the token entity
         PasswordResetToken resetToken = new PasswordResetToken();
         resetToken.setToken(otp);
         resetToken.setUser(user);
@@ -81,31 +80,26 @@ public class AuthenticationService {
 
         log.info("SECURITY: Password reset OTP generated and emailed to: {}", request.getEmail());
 
-        // Send the email asynchronously
         notificationService.sendPasswordResetEmail(user.getEmail(), user.getUsername(), otp);
     }
 
     public void resetPassword(ResetPasswordRequest request) {
-        // Find the token in the DB
         PasswordResetToken resetToken = tokenRepository.findByToken(request.getToken())
                 .orElseThrow(() -> {
                             log.warn("SECURITY WARNING: Attempt to reset password with INVALID token.");
                             return new RuntimeException("Invalid token!");
                 });
 
-        // Check if it's expired
         if (resetToken.isExpired()) {
-            tokenRepository.delete(resetToken); // Clean up dead token
+            tokenRepository.delete(resetToken);
             log.warn("SECURITY WARNING: Attempt to reset password with EXPIRED token for user: {}", resetToken.getUser().getEmail());
             throw new RuntimeException("Token has expired. Please request a new one.");
         }
 
-        // Update the user's password
         User user = resetToken.getUser();
         user.setPassword(passwordEncoder.encode(request.getNewPassword()));
         userRepository.save(user);
 
-        // Delete the token so it can't be used again
         tokenRepository.delete(resetToken);
 
         log.info("SECURITY: Password successfully reset for user: {}", user.getEmail());

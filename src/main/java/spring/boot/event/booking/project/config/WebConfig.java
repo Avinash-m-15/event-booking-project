@@ -12,7 +12,6 @@ public class WebConfig implements WebMvcConfigurer {
 
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
-        // Expose the "uploads/images" folder to the web
         Path uploadDir = Paths.get("uploads/images");
         String uploadPath = uploadDir.toFile().getAbsolutePath();
 

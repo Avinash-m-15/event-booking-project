@@ -25,7 +25,6 @@ public class EventDTO implements Serializable {
     private String location;
 
     @NotNull(message = "Total seats must be specified")
-    @Min(value = 1, message = "Total seats must be at least 1")
     private LocalDateTime eventDate;
 
     @NotNull(message = "Total seats must be specified")

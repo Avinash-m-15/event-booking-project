@@ -55,7 +55,6 @@ public class BookingService {
             throw new BookingFailedException("Organizers cannot book their own events");
         }
 
-        // Fetch any existing booking attempt for this user and event
         List<Booking> existingBookings = bookingRepository.findByUserAndEvent(user, event);
 
         if (!existingBookings.isEmpty()) {
@@ -66,13 +65,11 @@ public class BookingService {
             }
 
             if (existing.getStatus() == BookingStatus.PENDING) {
-                // Recycle PENDING: Just update Order ID, do NOT deduct a seat
                 existing.setPaymentReferenceId(payPalOrderId);
                 return bookingMapper.toResponse(bookingRepository.save(existing));
             }
 
             if (existing.getStatus() == BookingStatus.FAILED || existing.getStatus() == BookingStatus.CANCELLED) {
-                // Recycle FAILED/CANCELLED: Must deduct a seat again before allowing retry
                 if (event.getAvailableSeats() <= 0) {
                     throw new BookingFailedException("Booking failed: No seats are available for this event");
                 }
@@ -80,14 +77,13 @@ public class BookingService {
 
                 existing.setStatus(BookingStatus.PENDING);
                 existing.setPaymentReferenceId(payPalOrderId);
-                existing.setCreatedAt(LocalDateTime.now()); // Reset so cron 10-min window starts fresh
+                existing.setCreatedAt(LocalDateTime.now());
 
                 eventRepository.save(event);
                 return bookingMapper.toResponse(bookingRepository.save(existing));
             }
         }
 
-        // If no existing booking was found, proceed as normal for a brand new booking
         if (event.getAvailableSeats() <= 0) {
             throw new BookingFailedException("Booking failed: No seats are available for this event");
         }
@@ -113,39 +109,33 @@ public class BookingService {
 
         if (!isActuallyPaid) {
             log.error("SECURITY ALERT: Received webhook for unpaid or fake Order ID: {}", payPalOrderId);
-            return; // Immediately exit. Do not confirm the booking.
+            return;
         }
 
-        // 2. Check if the booking exists gracefully instead of throwing an error
         Optional<Booking> bookingOpt = bookingRepository.findByPaymentReferenceId(payPalOrderId);
 
         if (bookingOpt.isEmpty()) {
             log.error("WEBHOOK WARNING: Received PayPal payment for unknown Order ID: {}. Ignoring.", payPalOrderId);
-            return; // Exit gracefully so PayPal receives a 200 OK and stops retrying
+            return;
         }
 
         Booking booking = bookingOpt.get();
 
-        // 3. Idempotency Check: Ensure we don't process the same webhook twice
         if (booking.getStatus() == BookingStatus.CONFIRMED) {
-            return; // Already processed, ignore safely.
+            return;
         }
 
-        // ── NEW SAFETY CHECK: The "Late Webhook" Auto-Refund ──
         if (booking.getStatus() == BookingStatus.FAILED || booking.getStatus() == BookingStatus.CANCELLED) {
             log.error("WEBHOOK WARNING: Payment received for FAILED/CANCELLED booking. Initiating Auto-Refund.");
 
-            // The cron job already gave their seat away, so we MUST return their money.
             payPalService.refundCapture(captureId);
             return;
         }
 
-        // 4. Mark as CONFIRMED
         booking.setStatus(BookingStatus.CONFIRMED);
         booking.setCaptureTransactionId(captureId);
         bookingRepository.save(booking);
 
-        // 5. Send the ticket email NOW, because we know we have the money
         notificationService.sendBookingConfirmation(
                 booking.getUser().getEmail(),
                 booking.getUser().getUsername(),
@@ -162,19 +152,17 @@ public class BookingService {
         Optional<Booking> bookingOpt = bookingRepository.findByPaymentReferenceId(payPalOrderId);
 
         if (bookingOpt.isEmpty()) {
-            return; // Exit gracefully, nothing to fail
+            return;
         }
 
         Booking booking = bookingOpt.get();
 
         if (booking.getStatus() != BookingStatus.PENDING) {
-            return; // Only fail pending bookings
+            return;
         }
 
-        // Mark as FAILED
         booking.setStatus(BookingStatus.FAILED);
 
-        // Give the seat back to the event pool
         Event event = booking.getEvent();
         event.setAvailableSeats(event.getAvailableSeats() + 1);
 
@@ -247,8 +235,6 @@ public class BookingService {
                 throw new BookingFailedException("Failed to process refund with PayPal. Cancellation aborted.");
             }
         } else {
-            // Edge case: If there is no capture ID, it means the payment never completed
-            // so we can just cancel it normally (like a pending lock).
             log.info("No Capture ID found, proceeding with local cancellation.");
         }
 
@@ -258,7 +244,6 @@ public class BookingService {
         bookingRepository.save(booking);
         eventRepository.save(event);
 
-        // --- NEW CODE: Send the professional cancellation email ---
         if (booking.getCaptureTransactionId() != null) {
             notificationService.sendCancellationEmail(
                     booking.getUser().getEmail(),
@@ -270,11 +255,9 @@ public class BookingService {
     }
 
     public List<BookingResponse> getAttendeesForEvent(Long eventId) {
-        // 1. Fetch the event
         Event event = eventRepository.findById(eventId)
                 .orElseThrow(() -> new EventNotFoundException("Event not found!"));
 
-        // 2. Security Check: Only the organizer or an admin can view the attendees
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String loggedUserEmail = authentication.getName();
         boolean isAdmin = authentication.getAuthorities().stream()
@@ -284,7 +267,6 @@ public class BookingService {
             throw new UnauthorizedAccessException("You do not have permission to view these attendees");
         }
 
-        // 3. Fetch bookings and map to response
         List<Booking> attendees = bookingRepository.findByEvent(event);
 
         return attendees.stream()

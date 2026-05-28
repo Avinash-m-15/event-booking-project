@@ -36,14 +36,11 @@ public class PayPalService {
     private double inrToUsdRate;
 
     private final RestClient restClient = RestClient.create();
-
-    // Token cache — PayPal tokens are valid for ~9 hours, we refresh after 8
     private String cachedToken = null;
     private long tokenExpiryTime = 0;
 
     private final EventService eventService;
 
-    // 1. Get OAuth Token from PayPal (cached — avoids redundant auth calls)
     private synchronized String getAccessToken() {
         if (cachedToken != null && System.currentTimeMillis() < tokenExpiryTime) {
             return cachedToken;
@@ -71,14 +68,11 @@ public class PayPalService {
         return cachedToken;
     }
 
-    // 2. Create the Order
     @SuppressWarnings("unchecked")
     public Map<String, Object> createOrder(double amount) {
         String accessToken = getAccessToken();
 
-        // Note: USD used for Sandbox compatibility.
-        // Real INR requires a verified India PayPal business account.
-        double usdAmount = amount / inrToUsdRate; // Rough INR → USD conversion
+        double usdAmount = amount / inrToUsdRate;
 
         Map<String, Object> requestBody = Map.of(
                 "intent", "CAPTURE",
@@ -99,7 +93,6 @@ public class PayPalService {
                 .body(Map.class);
     }
 
-    // 3. Capture (Confirm) the Payment
     @SuppressWarnings("unchecked")
     public Map<String, Object> captureOrder(String orderId) {
         String accessToken = getAccessToken();
@@ -112,7 +105,6 @@ public class PayPalService {
                 .body(Map.class);
     }
 
-    // 4. Process a Full Refund
     public boolean refundCapture(String captureId) {
         try {
             String accessToken = getAccessToken();
@@ -135,7 +127,6 @@ public class PayPalService {
         }
     }
 
-    // 5. Create Order using DB price — frontend amount is never trusted
     public Map<String, Object> createOrderForEvent(Long eventId) {
         EventDTO event = eventService.findEventById(eventId);
 
@@ -149,7 +140,6 @@ public class PayPalService {
         return createOrder(correctAmount);
     }
 
-    // 6. Verify the Order Status Directly with PayPal (Webhook Security)
     public boolean verifyOrderIsCompleted(String orderId) {
         try {
             String accessToken = getAccessToken();
@@ -161,7 +151,6 @@ public class PayPalService {
                     .retrieve()
                     .body(Map.class);
 
-            // PayPal returns "COMPLETED" only if the money has successfully settled
             String status = (String) response.get("status");
             return "COMPLETED".equals(status);
 

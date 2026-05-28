@@ -35,11 +35,9 @@ public class NotificationService {
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.set("api-key", apiKey);
 
-        // 1. Generate QR Code URL
         String frontendUrl = "http://localhost:5173";
         String qrCodeUrl = "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=" + frontendUrl + "/verify/" + bookingId + "&format=jpeg";
 
-        // 2. Crafting the Rich HTML Email (This IS the ticket!)
         String htmlContent = String.format(
                 "<html><body style='font-family: Helvetica, Arial, sans-serif; background-color: #f4f4f5; padding: 20px;'>" +
                         "<div style='max-width: 500px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05);'>" +
@@ -66,11 +64,9 @@ public class NotificationService {
                         "</div></body></html>",
                 eventName, bookingId, eventDate.toString().replace("T", " "), location, ticketPrice, qrCodeUrl);
 
-        // 3. Generate Calendar Invite (.ics)
         String icsContent = generateIcs(eventName, eventDate, location);
         String icsBase64 = Base64.getEncoder().encodeToString(icsContent.getBytes(StandardCharsets.UTF_8));
 
-        // 4. Build Brevo Payload (Only attaching the .ics file)
         Map<String, Object> body = Map.of(
                 "sender", Map.of("name", "EventBook Tickets", "email", "avinash2005m@gmail.com"),
                 "to", List.of(Map.of("email", toEmail, "name", userName)),
@@ -117,7 +113,6 @@ public class NotificationService {
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.set("api-key", apiKey);
 
-        // Crafting the Reset Email
         String htmlContent = String.format(
                 "<html><body><h2>Hi %s,</h2>" +
                         "<p>You requested a password reset for your Event Booking account.</p>" +
@@ -155,7 +150,6 @@ public class NotificationService {
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.set("api-key", apiKey);
 
-        // Crafting the Professional Cancellation HTML Email
         String htmlContent = String.format(
                 "<html><body style='font-family: Helvetica, Arial, sans-serif; background-color: #f4f4f5; padding: 20px;'>" +
                         "<div style='max-width: 500px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05);'>" +

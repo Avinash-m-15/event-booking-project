@@ -11,7 +11,6 @@ import java.util.List;
 @Repository
 public interface EventRepository extends JpaRepository<Event, Long> {
 
-    // Finds events where either the name OR the location contains the search string (case-insensitive)
     Page<Event> findByEventNameContainingIgnoreCaseOrLocationContainingIgnoreCase(
             String name, String location, Pageable pageable);
 

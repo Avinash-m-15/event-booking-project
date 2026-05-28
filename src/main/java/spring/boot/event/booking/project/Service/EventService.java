@@ -9,6 +9,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 import spring.boot.event.booking.project.DTO.EventDTO;
 import spring.boot.event.booking.project.DTO.PageResponse;
 import spring.boot.event.booking.project.Entity.Event;
@@ -27,14 +28,18 @@ public class EventService {
     private final EventRepository eventRepository;
     private final EventMapper eventMapper;
     private final UserRepository userRepository;
+    private final SupabaseStorageService storageService;
 
     @Transactional
-    public EventDTO createEvent(EventDTO eventDTO) {
-
+    public EventDTO createEvent(EventDTO eventDTO, MultipartFile image) throws Exception {
         String loggedUserEmail = SecurityContextHolder.getContext().getAuthentication().getName();
-
         User organizer = userRepository.findByEmail(loggedUserEmail)
                 .orElseThrow(() -> new UserNotFoundException("Logged in user not found in database!"));
+
+        if (image != null && !image.isEmpty()) {
+            String imageUrl = storageService.uploadImage(image);
+            eventDTO.setImageUrl(imageUrl);
+        }
 
         Event event = eventMapper.toEntity(eventDTO);
         event.setOrganizer(organizer);
@@ -44,19 +49,16 @@ public class EventService {
         }
 
         Event savedEvent = eventRepository.save(event);
-
         return eventMapper.toDTO(savedEvent);
     }
 
     @Cacheable(value = "events", key = "#pageable.pageNumber + '_' + #pageable.pageSize", sync = true)
     public PageResponse<EventDTO> getAllEvents(Pageable pageable) {
-        // 1. Fetch from DB
+
         Page<Event> page = eventRepository.findAll(pageable);
 
-        // 2. Convert Event to EventDTO
         Page<EventDTO> dtoPage = page.map(eventMapper::toDTO);
 
-        // 3. Wrap in our custom Serializable DTO and return!
         return new PageResponse<>(dtoPage);
     }
 
@@ -71,7 +73,7 @@ public class EventService {
 
     @Transactional
     @CacheEvict(value = "single_event", key = "#id")
-    public EventDTO updateEvent(Long id, EventDTO eventDTO) {
+    public EventDTO updateEvent(Long id, EventDTO eventDTO, MultipartFile image) throws Exception {
 
         Event event = eventRepository.findById(id)
                 .orElseThrow(() -> new EventNotFoundException("Event not found with id: " + id));
@@ -84,6 +86,11 @@ public class EventService {
 
         if (!event.getOrganizer().getEmail().equals(loggedUserEmail) && !isAdmin) {
             throw new UnauthorizedAccessException("You do not have permission to update this event");
+        }
+
+        if (image != null && !image.isEmpty()) {
+            String imageUrl = storageService.uploadImage(image);
+            eventDTO.setImageUrl(imageUrl);
         }
 
         eventMapper.updateEntityFromDTO(eventDTO, event);
@@ -114,12 +121,10 @@ public class EventService {
     @Cacheable(value = "events", key = "'search-' + #query + '-' + #pageable.pageNumber + '-' + #pageable.pageSize", sync = true)
     public PageResponse<EventDTO> searchEvents(String query, Pageable pageable) {
 
-        // 1. Fetch from DB and map to DTO in one clean chain
         Page<EventDTO> dtoPage = eventRepository
                 .findByEventNameContainingIgnoreCaseOrLocationContainingIgnoreCase(query, query, pageable)
                 .map(eventMapper::toDTO);
 
-        // 2. Wrap it in our custom Serializable DTO to prevent Redis crashes
         return new PageResponse<>(dtoPage);
     }
 }

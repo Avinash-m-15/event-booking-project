@@ -7,8 +7,10 @@ import org.springframework.data.domain.PageRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 import spring.boot.event.booking.project.DTO.BookingResponse;
 import spring.boot.event.booking.project.DTO.EventDTO;
 import spring.boot.event.booking.project.DTO.PageResponse;
@@ -27,9 +29,11 @@ public class EventController {
     private final EventService eventService;
     private final BookingService bookingService;
 
-    @PostMapping
-    public ResponseEntity<EventDTO> createEvent(@Valid @RequestBody EventDTO eventDTO ) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(eventService.createEvent(eventDTO));
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<EventDTO> createEvent(
+            @RequestPart("event") @Valid EventDTO eventDTO,
+            @RequestPart(value = "image", required = false) MultipartFile image) throws Exception {
+        return ResponseEntity.status(HttpStatus.CREATED).body(eventService.createEvent(eventDTO, image));
     }
 
     @GetMapping
@@ -41,7 +45,6 @@ public class EventController {
         PageRequest pageable = PageRequest.of(page, size, Sort.by("eventDate").ascending());
 
         if(search != null && !search.isBlank()) {
-            // Make sure your service method also returns PageResponseDTO!
             return ResponseEntity.ok(eventService.searchEvents(search, pageable));
         }
         return ResponseEntity.ok(eventService.getAllEvents(pageable));
@@ -58,28 +61,26 @@ public class EventController {
         return ResponseEntity.noContent().build();
     }
 
-    @PutMapping("/{id}")
-    public ResponseEntity<EventDTO> updateEvent(@PathVariable Long id, @Valid @RequestBody EventDTO eventDTO) {
-        return ResponseEntity.ok(eventService.updateEvent(id, eventDTO));
+    @PutMapping(value = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<EventDTO> updateEvent(
+            @PathVariable Long id,
+            @RequestPart("event") @Valid EventDTO eventDTO,
+            @RequestPart(value = "image", required = false) MultipartFile image) throws Exception {
+        return ResponseEntity.ok(eventService.updateEvent(id, eventDTO, image));
     }
 
     @GetMapping("/{eventId}/export-attendees")
     public void exportAttendeesToCSV(@PathVariable Long eventId, HttpServletResponse response) throws IOException {
 
-        // 1. Set the correct HTTP Headers so the browser knows it is receiving a file download
         response.setContentType("text/csv");
         response.setHeader("Content-Disposition", "attachment; filename=\"attendees_event_" + eventId + ".csv\"");
 
-        // 2. Fetch the data using the method you already wrote in BookingService
         List<BookingResponse> attendees = bookingService.getAttendeesForEvent(eventId);
 
-        // 3. Open a PrintWriter to stream data directly to the client
         PrintWriter writer = response.getWriter();
 
-        // Write the CSV Column Headers
         writer.println("Booking ID,Attendee Name,Email,Ticket Status,Booking Date");
 
-        // Write the data rows
         for (BookingResponse attendee : attendees) {
             writer.println(
                     attendee.getBookingId() + "," +
@@ -90,7 +91,6 @@ public class EventController {
             );
         }
 
-        // Flush the writer to ensure all data is sent out over the network
         writer.flush();
     }
 }

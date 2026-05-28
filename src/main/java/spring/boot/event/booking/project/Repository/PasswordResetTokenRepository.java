@@ -9,6 +9,5 @@ import java.util.Optional;
 @Repository
 public interface PasswordResetTokenRepository extends JpaRepository<PasswordResetToken, Long> {
 
-    // We need this to find the token when the user submits their new password
     Optional<PasswordResetToken> findByToken(String token);
 }
