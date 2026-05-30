@@ -93,9 +93,4 @@ public class EventController {
 
         writer.flush();
     }
-
-    @GetMapping("/sys/health")
-    public ResponseEntity<String> health() {
-        return ResponseEntity.ok("OK");
-    }
 }
