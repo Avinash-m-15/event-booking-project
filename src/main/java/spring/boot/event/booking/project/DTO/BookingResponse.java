@@ -25,4 +25,5 @@ public class BookingResponse {
     private LocalDateTime bookingDate;
     @JsonProperty("isCancellable")
     private boolean cancellable;
+    private boolean checkedIn;
 }
