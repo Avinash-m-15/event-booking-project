@@ -22,6 +22,7 @@ public interface BookingMapper {
     BookingResponse toResponse(Booking booking);
 
     @Mapping(target = "bookingId", source = "bookingId")
+    @Mapping(target = "username", source = "user.username")
     @Mapping(target = "status", source = "status")
     @Mapping(target = "eventName", source = "event.eventName")
     @Mapping(target = "eventDate", source = "event.eventDate")

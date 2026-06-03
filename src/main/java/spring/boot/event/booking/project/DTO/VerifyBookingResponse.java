@@ -12,6 +12,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 public class VerifyBookingResponse {
     private Long bookingId;
+    private String username;
     private String eventName;
     private LocalDateTime eventDate;
     private String location;
