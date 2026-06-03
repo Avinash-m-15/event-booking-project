@@ -133,6 +133,7 @@ public class BookingService {
         }
 
         booking.setStatus(BookingStatus.CONFIRMED);
+        booking.setBookingDate(LocalDateTime.now());
         booking.setCaptureTransactionId(captureId);
         bookingRepository.save(booking);
 
@@ -274,9 +275,34 @@ public class BookingService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional
     public VerifyBookingResponse verifyBooking(Long id) {
         Booking booking = bookingRepository.findById(id)
                 .orElseThrow(() -> new BookingNotFoundException("Booking not found!"));
+
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String scannerEmail = authentication.getName();
+        boolean isAdmin = authentication.getAuthorities().stream()
+                .anyMatch(authority -> authority.getAuthority().equals("ROLE_ADMIN"));
+
+        String organizerEmail = booking.getEvent().getOrganizer().getEmail();
+        boolean isOrganizer = organizerEmail.equals(scannerEmail);
+
+        if (!isOrganizer && !isAdmin) {
+            throw new UnauthorizedAccessException("Only the Event Organizer or an Admin can verify tickets.");
+        }
+
+        if (booking.isCheckedIn()) {
+            throw new BookingFailedException("TICKET FRAUD ALERT: This ticket has already been scanned at the gate!");
+        }
+
+        if (booking.getStatus() != BookingStatus.CONFIRMED) {
+            throw new BookingFailedException("Ticket is " + booking.getStatus() + ". Do not allow entry.");
+        }
+
+        booking.setCheckedIn(true);
+        bookingRepository.save(booking);
+
         return bookingMapper.toVerifyResponse(booking);
     }
 

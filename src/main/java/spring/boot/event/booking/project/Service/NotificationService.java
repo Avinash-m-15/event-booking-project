@@ -25,6 +25,9 @@ public class NotificationService {
     @Value("${brevo.api.key}")
     private String apiKey;
 
+    @Value("${app.frontend.url}")
+    private String frontendUrl;
+
     private final String BREVO_API_URL = "https://api.brevo.com/v3/smtp/email";
 
     @Async
@@ -35,7 +38,6 @@ public class NotificationService {
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.set("api-key", apiKey);
 
-        String frontendUrl = "http://localhost:5173";
         String qrCodeUrl = "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=" + frontendUrl + "/verify/" + bookingId + "&format=jpeg";
 
         String htmlContent = String.format(

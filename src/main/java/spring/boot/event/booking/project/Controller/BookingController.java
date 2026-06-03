@@ -54,7 +54,7 @@ public class BookingController {
         return ResponseEntity.ok(bookingService.getAttendeesForEvent(id));
     }
 
-    @GetMapping("/verify/{id}")
+    @PostMapping("/verify/{id}")
     public ResponseEntity<VerifyBookingResponse> verifyBooking(@PathVariable Long id) {
         return ResponseEntity.ok(bookingService.verifyBooking(id));
     }

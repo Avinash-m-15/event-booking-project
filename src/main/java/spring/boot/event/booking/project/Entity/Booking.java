@@ -30,7 +30,7 @@ public class Booking {
     @Column(name = "status", nullable = false)
     private BookingStatus status;
 
-    @Column(name = "booking_date", insertable = false, updatable = false)
+    @Column(name = "booking_date")
     private LocalDateTime bookingDate;
 
     @Column(name = "payment_reference_id")
@@ -41,5 +41,8 @@ public class Booking {
 
     @Column(name = "capture_transaction_id")
     private String captureTransactionId;
+
+    @Column(name = "checked_in", nullable = false)
+    private boolean checkedIn = false;
 
 }
